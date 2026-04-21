@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/x-icon" href="register.png" />
+  <title>Form Kehadiran Peserta</title>
+
+  <!-- CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f7f7f7; }
+    .card { max-width: 600px; margin: auto; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    #deviceBox { margin-top: 10px; font-size: 0.85rem; color: #555; }
+    #warningBox, #warningBox2 { margin-top: 10px; color: red; font-weight: bold; }
+    #modalSpinner { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); z-index:1000; justify-content:center; align-items:center; flex-direction:column; }
+    #modalSpinner.show { display:flex; }
+    #modalSpinner .spinner-border { color:#fff; width:3rem; height:3rem; }
+    #map { height:300px; margin-bottom:10px; border-radius:8px; }
+    .hidden-group { display: none !important; }
+    .small-note { font-size:0.85rem; color:#555; margin-top:6px; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h3 class="mb-4 text-center">Form Pendaftaran Peserta</h3>
+
+    <div id="map"></div>
+    <div id="locationStatus" class="alert alert-info py-2">Mendeteksi lokasi...</div>
+
+    <button id="retryLocationBtn" type="button" class="btn btn-outline-primary btn-sm mb-3">
+      <i class="fa-solid fa-location-crosshairs"></i> Coba Lagi Izinkan Lokasi
+    </button>
+
+    <div id="warningBox"></div>
+    <div id="deviceBox"></div>
+
+    <form id="mainForm" class="row g-3">
+      <!-- EMAIL (dapat disembunyikan saat jk=evaluasi) -->
+      <div class="col-12" id="group-email">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-control" name="email" required />
+        <div class="small-note" id="note-email-mode" style="display:none;">Field email disembunyikan untuk mode evaluasi.</div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Nama Lengkap</label>
+        <input type="text" class="form-control" name="nama" required />
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Instansi/OPD</label>
+        <select name="instansi" class="form-select" id="instansiSelect" required></select>
+      </div>
+
+      <!-- STATUS (tetap tampil) -->
+      <div class="col-12">
+        <label class="form-label">Status Kepegawaian</label>
+        <select name="status" id="statusSelect" class="form-select" required></select>
+      </div>
+
+      <div class="col-12">
+        <label for="nip">NIP</label>
+        <input id="nip" name="nip" type="number" inputmode="numeric" pattern="[0-9]*" class="form-control" />
+      </div>
+
+      <!-- USIA (dapat disembunyikan saat jk=evaluasi) -->
+      <div class="col-12 col-md-6" id="group-usia">
+        <label class="form-label">Usia</label>
+        <select name="usia" class="form-select" required></select>
+        <div class="small-note" id="note-usia-mode" style="display:none;">Field usia disembunyikan untuk mode evaluasi.</div>
+      </div>
+
+      <!-- JABATAN (dapat disembunyikan saat jk=evaluasi) -->
+      <div class="col-12 col-md-6" id="group-jabatan">
+        <label class="form-label">Jabatan</label>
+        <select name="jabatan" class="form-select" required></select>
+        <div class="small-note" id="note-jabatan-mode" style="display:none;">Field jabatan disembunyikan untuk mode evaluasi.</div>
+      </div>
+
+      <div class="col-12">
+        <label for="nohp">No HP</label>
+        <input id="nohp" name="nohp" type="tel" inputmode="numeric" pattern="[0-9]*" class="form-control" />
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Jenis Kelamin</label>
+        <select name="gender" class="form-select" required></select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Nama Acara</label>
+        <select name="acara" class="form-select" required></select>
+      </div>
+
+      <div id="result"></div>
+      <div id="warningBox2"></div>
+
+      <div class="col-12 text-center mt-3">
+        <button type="submit" class="btn btn-primary me-2">
+          <i class="fa-solid fa-paper-plane"></i> Submit
+        </button>
+
+        <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSxYKQRGc0XkH86jvx7TVHv5OLPp4M44kWzPfTrqVnXzvZr_gTfgjkAlZA2DDIuIDNasY-2xgP0Ta2U/pubhtml?gid=1367122002&single=true"
+          target="_blank" class="btn btn-secondary">
+          <i class="fa-solid fa-gauge"></i> Dashboard
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div id="modalSpinner">
+    <div class="spinner-border" role="status"></div>
+    <div class="text-white mt-2">Loading...</div>
+  </div>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    // ======== KONFIG & STATE ========
+    let cekLokasi = 1;
+    let cekDeviceID = 1;
+    const apiUrl = "https://script.google.com/macros/s/AKfycbwOI8RQJuxOQb8PEq2JOeANCIXlwM_mznPS_uMteogNpOXwopu6KoCspjoaT1iDiDYj/exec";
+    const spinner = document.getElementById("modalSpinner");
+    const resultBox = document.getElementById("result");
+    const warningBox = document.getElementById("warningBox");
+    const warningBox2 = document.getElementById("warningBox2");
+    const mainForm = document.getElementById("mainForm");
+    const statusSelect = document.getElementById("statusSelect");
+    const nipField = document.getElementById("nip");
+    let cachedFP = null;
+
+    // Ambil nilai jk dari query string (bimtek | evaluasi)
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+    const jkParam = (getQueryParam('jk') || '').toLowerCase(); // 'bimtek' | 'evaluasi' | ''
+
+    // ======== UTIL ========
+    function showSpinner(){ spinner.classList.add("show"); }
+    function hideSpinner(){ spinner.classList.remove("show"); }
+
+    async function sha256(msg) {
+      const buf = new TextEncoder().encode(msg);
+      const hash = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeout = 20000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return res;
+      } catch (err) {
+        clearTimeout(id);
+        throw new Error("Request timeout or fetch failed: " + err.message);
+      }
+    }
+
+    // ======== FINGERPRINT & DEVICE CHECK ========
+    async function getFingerprint() {
+      if (cachedFP) return cachedFP;
+      const ua = navigator.userAgent;
+      const screenRes = `${screen.width}x${screen.height}`;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const lang = navigator.language;
+      let ip = "N/A";
+      try {
+        ip = (await (await fetchWithTimeout("https://api.ipify.org?format=json", {}, 3000)).json()).ip;
+      } catch (e) { console.warn("Gagal ambil IP:", e); }
+      const raw = `${ua}|${screenRes}|${tz}|${lang}|${ip}`;
+      const deviceID = await sha256(raw);
+      cachedFP = { deviceID, ip };
+      document.getElementById("deviceBox").textContent = `Device ID: ${deviceID} | IP: ${ip}`;
+      return cachedFP;
+    }
+
+    async function checkDeviceToday(deviceID) {
+      try {
+        const res = await fetchWithTimeout(`${apiUrl}?action=checkDevice&deviceID=${encodeURIComponent(deviceID)}${jkParam ? '&jk=' + encodeURIComponent(jkParam) : ''}`, {}, 8000);
+        const data = await res.json();
+        if (data.used) {
+          warningBox.textContent = "⚠️ Device ini sudah melakukan input hari ini.";
+          warningBox2.textContent = warningBox.textContent;
+          document.querySelectorAll("#mainForm input, #mainForm select, #mainForm button").forEach((el) => (el.disabled = true));
+        }
+        return data.used;
+      } catch (err) {
+        console.warn("checkDeviceToday error:", err);
+        warningBox2.textContent = "";
+        return false;
+      }
+    }
+
+    // ======== LOAD OPTIONS ========
+    async function loadOptionsAndCheckDevice() {
+      showSpinner();
+      try {
+        const res = await fetchWithTimeout(`${apiUrl}?action=getOptions${jkParam ? '&jk=' + encodeURIComponent(jkParam) : ''}`, { cache: "no-store" });
+        const data = await res.json();
+
+        ["instansi","status","usia","jabatan","gender","acara"].forEach(name=>{
+          const sel = document.querySelector(`[name='${name}']`);
+          if(!sel) return;
+          sel.innerHTML = "<option value=''>-- Pilih --</option>";
+          (data[name] || []).forEach(v=>{
+            const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o);
+          });
+        });
+
+        $("#instansiSelect").select2({ placeholder: "-- Pilih Instansi --", allowClear: true, width: "100%" });
+      } catch(err) {
+        resultBox.textContent = "Gagal memuat data: " + err;
+        console.error(err);
+      } finally { hideSpinner(); }
+
+      // Terapkan JK behavior (hide / set skip)
+      applyJkBehavior();
+
+      if (cekDeviceID === 1) {
+        (async()=> {
+          try {
+            warningBox2.textContent = "Memeriksa perangkat...";
+            const fp = await getFingerprint();
+            await checkDeviceToday(fp.deviceID);
+          } catch (err) {
+            console.warn("Background device-check error:", err);
+          } finally {
+            if (!warningBox.textContent) warningBox2.textContent = "";
+          }
+        })();
+      } else {
+        warningBox2.textContent = "ℹ️ Pengecekan device dimatikan (mode bebas).";
+      }
+    }
+
+    // ======== PERILAKU JK ========
+    function applyJkBehavior(){
+      // kelompok yang bisa disembunyikan: email, usia, jabatan
+      const gEmail = document.getElementById('group-email');
+      const gUsia = document.getElementById('group-usia');
+      const gJabatan = document.getElementById('group-jabatan');
+
+      const inputEmail = document.querySelector("[name='email']");
+      const selUsia = document.querySelector("[name='usia']");
+      const selJabatan = document.querySelector("[name='jabatan']");
+
+      const noteEmail = document.getElementById('note-email-mode');
+      const noteUsia = document.getElementById('note-usia-mode');
+      const noteJabatan = document.getElementById('note-jabatan-mode');
+
+      if (jkParam === 'evaluasi') {
+        // sembunyikan UI
+        if (gEmail) gEmail.classList.add('hidden-group');
+        if (gUsia) gUsia.classList.add('hidden-group');
+        if (gJabatan) gJabatan.classList.add('hidden-group');
+
+        // tampilkan catatan singkat (opsional)
+        if (noteEmail) noteEmail.style.display = 'block';
+        if (noteUsia) noteUsia.style.display = 'block';
+        if (noteJabatan) noteJabatan.style.display = 'block';
+
+        // hapus required sehingga HTML5 tidak blokir form
+        if (inputEmail) inputEmail.removeAttribute('required');
+        if (selUsia) selUsia.removeAttribute('required');
+        if (selJabatan) selJabatan.removeAttribute('required');
+
+        // Non-aktifkan interaksi supaya user tidak bisa ubah (tetapi kita TIDAK menggunakan disabled supaya nilai tetap bisa diambil jika perlu)
+        // Namun select tidak punya readonly, jadi kita set disabled (tidak akan terkirim) — sebagai gantinya kita akan memasukkan nilai 'skip' saat submit.
+        if (inputEmail) { inputEmail.disabled = true; inputEmail.value = ''; }
+        if (selUsia) { selUsia.disabled = true; }
+        if (selJabatan) { selJabatan.disabled = true; }
+
+      } else {
+        // mode default (bimtek / kosong): tunjukkan semua
+        if (gEmail) gEmail.classList.remove('hidden-group');
+        if (gUsia) gUsia.classList.remove('hidden-group');
+        if (gJabatan) gJabatan.classList.remove('hidden-group');
+
+        if (noteEmail) noteEmail.style.display = 'none';
+        if (noteUsia) noteUsia.style.display = 'none';
+        if (noteJabatan) noteJabatan.style.display = 'none';
+
+        if (inputEmail) { inputEmail.disabled = false; inputEmail.setAttribute('required','required'); }
+        if (selUsia) { selUsia.disabled = false; selUsia.setAttribute('required','required'); }
+        if (selJabatan) { selJabatan.disabled = false; selJabatan.setAttribute('required','required'); }
+      }
+    }
+
+    // ======== MAP / LOKASI (tidak diubah) ========
+    const LOCATION_CENTER = { lat: 1.1281501914821586, lng: 104.05568595766977};
+    const LOCATION_RADIUS_METERS = 100;
+    let map, circle, userMarker;
+    function initMap() {
+      const statusEl = document.getElementById("locationStatus");
+      if (cekLokasi === 0) {
+        statusEl.textContent = "✅ Pengecekan lokasi dimatikan (mode bebas).";
+        statusEl.className = "alert alert-secondary py-2";
+        document.querySelectorAll("#mainForm input, #mainForm select, #mainForm button").forEach((el) => (el.disabled = false));
+
+        map = L.map("map").setView([LOCATION_CENTER.lat, LOCATION_CENTER.lng], 16);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+        L.circle([LOCATION_CENTER.lat, LOCATION_CENTER.lng], { color: "blue", fillColor: "#3f9fff", fillOpacity: 0.2, radius: LOCATION_RADIUS_METERS }).addTo(map);
+        L.marker([LOCATION_CENTER.lat, LOCATION_CENTER.lng]).addTo(map).bindPopup("Titik Pusat").openPopup();
+        return;
+      }
+
+      map = L.map("map").setView([LOCATION_CENTER.lat, LOCATION_CENTER.lng], 16);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+      circle = L.circle([LOCATION_CENTER.lat, LOCATION_CENTER.lng], { color: "blue", fillColor: "#3f9fff", fillOpacity: 0.2, radius: LOCATION_RADIUS_METERS }).addTo(map);
+      L.marker([LOCATION_CENTER.lat, LOCATION_CENTER.lng]).addTo(map).bindPopup("Titik Pusat").openPopup();
+
+      function setFormEnabled(enabled){
+        document.querySelectorAll("#mainForm input, #mainForm select").forEach((el) => { el.disabled = !enabled; });
+        document.querySelector("#mainForm button[type='submit']").disabled = !enabled;
+      }
+
+      function successCallback(pos){
+        const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+        userMarker = L.marker([lat, lng]).addTo(map).bindPopup("Lokasi Anda").openPopup();
+        map.setView([lat, lng], 16);
+        const dist = map.distance([lat, lng], [LOCATION_CENTER.lat, LOCATION_CENTER.lng]);
+        if (dist <= LOCATION_RADIUS_METERS) {
+          statusEl.textContent = `✅ Anda di dalam area (jarak ${Math.round(dist)} m, akurasi ${Math.round(acc)} m)`;
+          statusEl.className = "alert alert-success py-2";
+          setFormEnabled(true);
+        } else {
+          statusEl.textContent = `❌ Anda di luar area (jarak ${Math.round(dist)} m, akurasi ${Math.round(acc)} m)`;
+          statusEl.className = "alert alert-danger py-2";
+          setFormEnabled(false);
+        }
+      }
+
+      function handleLocationError(err){
+        const code = err.code;
+        const messages = { 1: "❌ Akses lokasi ditolak. Aktifkan izin lokasi lalu klik 'Coba Lagi'.", 2: "⚠️ Lokasi tidak tersedia.", 3: "⚠️ Timeout mendeteksi lokasi." };
+        statusEl.textContent = messages[code] || `⚠️ Gagal mendeteksi lokasi: ${err.message}`;
+        statusEl.className = "alert alert-warning py-2";
+        setFormEnabled(false);
+      }
+
+      if (navigator.geolocation) { navigator.geolocation.getCurrentPosition(successCallback, handleLocationError); } else {
+        statusEl.textContent = "⚠️ Geolocation tidak didukung browser ini."; statusEl.className = "alert alert-warning py-2"; setFormEnabled(false);
+      }
+
+      document.getElementById("retryLocationBtn").addEventListener("click", () => {
+        if (navigator.geolocation) navigator.geolocation.getCurrentPosition(successCallback, handleLocationError);
+      });
+    }
+
+    // ======== SUBMIT FORM (pastikan 'skip' dikirim saat evaluasi) ========
+    mainForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showSpinner();
+      try {
+        let fp = { deviceID: "skip-check", ip: "0.0.0.0" };
+        if (cekDeviceID === 1) {
+          fp = cachedFP || await getFingerprint();
+          if (!cachedFP) cachedFP = fp;
+          const deviceUsed = await checkDeviceToday(fp.deviceID);
+          if (deviceUsed) { hideSpinner(); return; }
+        }
+
+        // Ambil form data
+        const formData = Object.fromEntries(new FormData(e.target).entries());
+
+        // Jika mode evaluasi: pastikan server menerima nilai 'skip' untuk email, usia, jabatan
+        if (jkParam === 'evaluasi') {
+          formData.email = 'skip';
+          formData.usia = 'skip';
+          formData.jabatan = 'skip';
+        }
+
+        formData.deviceID = fp.deviceID;
+        formData.ip = fp.ip;
+        if (jkParam) formData.jk = jkParam;
+
+        // Kirim ke server (sertakan jk di query string juga supaya server bisa menyesuaikan)
+        const res = await fetchWithTimeout(apiUrl + (jkParam ? '?jk=' + encodeURIComponent(jkParam) : ''), {
+          method: "POST",
+          body: JSON.stringify(formData),
+          headers: { "Content-Type": "text/plain" },
+        });
+
+        const data = await res.json();
+        resultBox.textContent = data.message;
+
+        if (data.status === "success") {
+          e.target.reset();
+          $('#instansiSelect').val(null).trigger('change');
+          setTimeout(() => location.reload(), 3000);
+        }
+
+      } catch (err) {
+        resultBox.textContent = "Error saat submit: " + err;
+        console.error("Submit error:", err);
+      } finally { hideSpinner(); }
+    });
+
+    // ======== TAMBAHAN: status change behavior (tidak diubah) ========
+    if (statusSelect) {
+      statusSelect.addEventListener("change", (e) => {
+        const status = e.target.value.toLowerCase();
+        if (nipField) {
+          if (status === "honorer") {
+            nipField.disabled = true; nipField.removeAttribute("required"); nipField.value = "";
+          } else {
+            nipField.disabled = false; nipField.setAttribute("required","required");
+          }
+        }
+      });
+    }
+
+    // Batasi input angka
+    document.querySelectorAll('#nip, #nohp').forEach(el => {
+      el.addEventListener('input', function(){ this.value = this.value.replace(/\D/g, ''); });
+    });
+
+    // ======== INISIALISASI ========
+    loadOptionsAndCheckDevice();
+    initMap();
+  </script>
+</body>
+</html>
