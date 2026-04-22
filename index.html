@@ -296,6 +296,17 @@
         if (inputEmail) { inputEmail.disabled = false; inputEmail.setAttribute('required','required'); }
         if (selUsia) { selUsia.disabled = false; selUsia.setAttribute('required','required'); }
         if (selJabatan) { selJabatan.disabled = false; selJabatan.setAttribute('required','required'); }
+
+        if (jkParam === 'bimtek') {
+          const status = document.querySelector("[name='status']");
+          const nip = document.querySelector("[name='nip']");
+          const nohp = document.querySelector("[name='nohp']");
+      
+          if (status) status.disabled = true;
+          if (nip) nip.disabled = true;
+          if (selUsia) selUsia.disabled = true;
+          if (nohp) nohp.disabled = true;
+        }
       }
     }
 
