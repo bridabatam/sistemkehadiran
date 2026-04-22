@@ -301,7 +301,8 @@
           const status = document.querySelector("[name='status']");
           const nip = document.querySelector("[name='nip']");
           const nohp = document.querySelector("[name='nohp']");
-      
+          
+            if (inputEmail) inputEmail.disabled = true;
           if (status) status.disabled = true;
           if (nip) nip.disabled = true;
           if (selUsia) selUsia.disabled = true;
