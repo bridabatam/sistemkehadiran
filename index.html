@@ -298,16 +298,24 @@
         if (selJabatan) { selJabatan.disabled = false; selJabatan.setAttribute('required','required'); }
 
         if (jkParam === 'bimtek') {
-          const status = document.querySelector("[name='status']");
-          const nip = document.querySelector("[name='nip']");
-          const nohp = document.querySelector("[name='nohp']");
-          
-            if (inputEmail) inputEmail.disabled = true;
-          if (status) status.disabled = true;
-          if (nip) nip.disabled = true;
-          if (selUsia) selUsia.disabled = true;
-          if (nohp) nohp.disabled = true;
-        }
+            const status = document.querySelector("[name='status']");
+            const nip = document.querySelector("[name='nip']");
+            const nohp = document.querySelector("[name='nohp']");
+        
+            // hide group
+            if (gEmail) gEmail.classList.add('hidden-group');
+            if (gUsia) gUsia.classList.add('hidden-group');
+        
+            // status & nohp tidak punya wrapper → hide parent
+            if (status) status.closest('.col-12')?.classList.add('hidden-group');
+            if (nip) nip.closest('.col-12')?.classList.add('hidden-group');
+            if (nohp) nohp.closest('.col-12')?.classList.add('hidden-group');
+        
+            // hapus required biar tidak blocking submit
+            if (inputEmail) inputEmail.removeAttribute('required');
+            if (selUsia) selUsia.removeAttribute('required');
+            if (status) status.removeAttribute('required');
+          }
       }
     }
 
